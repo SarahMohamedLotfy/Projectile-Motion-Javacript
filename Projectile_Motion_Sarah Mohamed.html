@@ -1,0 +1,479 @@
+<!doctype html>
+<html class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <title>Projectile Motion</title>
+    <style>
+   @import url(http://fonts.googleapis.com/css?family=Titillium+Web:600);
+
+input,select{width:100%;font-size:13px}
+@keyframes fadeIn{0%{opacity:0}100%{opacity:1}}
+.fade-in{-webkit-animation:fadeIn 1s ease 0s 1 normal both;animation:fadeIn 1s ease 0s 1 normal both}
+
+.projectile-controls{width:95%;
+    margin:1rem auto 0 1rem;
+    opacity:0}
+.projectile-controls fieldset{width:100%;
+    margin:0;
+    background:#FFE4C4}
+.projectile-controls fieldset:last-of-type{margin:0 0 2rem 0}
+
+.projectile-controls button{background:#0000FF	;
+    color: white;
+    padding:1rem 2rem;
+    clear:both}
+
+.projectile-controls label{display:inline-block;
+    margin:0 0 .5rem 0}
+
+.projectile-controls button{text-transform:uppercase;
+    cursor:pointer}
+
+.simulation-container{position:relative;
+    height:40rem;
+    background:yellow;
+    border-bottom:5px solid #000;
+    }
+
+.projectile{position:absolute;
+    bottom:0;left:0;
+    width:4rem;
+    height:4rem;
+    border-radius:50%;
+    background:#D729CF;
+    z-index:1;opacity:0}
+
+.angle{position:absolute;
+    left:2rem;bottom:2rem;
+    width:9.375em;
+    -webkit-transform:rotate(-45deg);
+    -ms-transform-origin:0% 50%;
+    transform-origin:0% 50%;
+    border-bottom:.2rem solid #000;
+    opacity:0;z-index:1}
+
+.angle:after{content:"";
+    position:absolute;left:100%;
+    -webkit-transform:translateY(calc(-50% + 1px));
+    -ms-transform:translateY(calc(-50% + 1px));
+    transform:translateY(calc(-50% + 1px));
+    border-top:.625em solid transparent;
+    border-bottom:.625em solid transparent;
+    border-left:.625em solid #000}
+    </style>
+</head>
+<body>
+
+
+  <div class="simulation-container">
+
+    <div class="projectile"></div>
+
+    <div class="angle"></div>
+
+  </div>
+  
+  <form class="projectile-controls">
+<div style="width: 1000px;">
+      <div style="float: left; width: 200px;">
+        <button class="submit">Launch</button>
+      </div>
+      <div style="float: left; width: 300px; font-size: 20px;">
+        <p>Distance in x direction </p>
+        <p id="xaxis"> 0 </p></div>
+      <div style="float: left; width: 200px; font-size: 20px;">
+        <p>Distance in y direction</p>
+        <p id="yaxis"> 0 </p>
+      </div>
+      <br style="clear: left;" />
+     </div>
+    <fieldset class="initV">
+      <label for="initV">Initial Velocity:</label>
+      <span class="initV-display"></span>
+      <input type="range" id="initV" name="initV" min="0" max="500" step="5" value="250">
+    </fieldset>
+
+    <fieldset class="theta">
+      <label for="theta">Angle (degrees):</label>
+      <span class="theta-display"></span>
+      <input type="range" id="theta" name="theta" min="0" max="90" step="5" value="45">
+    </fieldset>
+
+    <fieldset class="initXPos">
+      <label for="initXPos">Initial X Position:</label>
+      <span class="initXPos-display"></span>
+      <input type="range" id="initXPos" name="initXPos" min="0" max="90" step="5" value="0">
+    </fieldset>
+
+    <fieldset class="initYPos">
+      <label for="initYPos">Initial Y Position:</label>
+      <span class="initYPos-display"></span>
+      <input type="range" id="initYPos" name="initYPos" min="0" max="90" step="5" value="0">
+    </fieldset>
+
+    
+  </form>
+
+  <script>
+    (function e(t,n,r){function s(o,u)
+  {if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;
+  if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}
+  var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];
+    return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;
+    for(var o=0;o<r.length;o++)s(r[o]);return s})
+
+({1:[function(require,module,exports){
+module.exports = {
+  simulationContainer: document.querySelector('.simulation-container'),
+  form: document.querySelector('.projectile-controls'),
+  projectile: document.querySelector('.projectile'),
+  angleLine: document.querySelector('.angle')
+};
+
+},{}],
+
+2:[function(require,module,exports){
+
+var domElements = require('./dom-elements');
+var formControls = require('./form-controls');
+var introScreen = require('./intro-screen');
+
+introScreen.init(domElements);
+formControls.init(domElements);
+
+},{"./dom-elements":1,"./form-controls":3,"./intro-screen":4,"physics-jumpy":5}],3:[function(require,module,exports){
+var Projectile = require('physics-projectile').default;
+
+var formControls = (function() {
+  var inputs,
+    input,
+    form,
+    runningAnimation,
+    container,
+    projectile,
+    angleLine,
+    angleLineInitXPos,
+    angleLineInitYPos;
+
+  var maxInitPos = function() {
+    var projectileWidth = projectile.clientWidth;
+    var projectileHeight = projectile.clientHeight;
+
+    initXPos.max = container.clientWidth - projectileWidth;
+    initYPos.max = container.clientHeight - projectileHeight;
+  };
+
+  var formValueDisplays = function() {
+    var initXPos = document.getElementById('initXPos');
+    var initYPos = document.getElementById('initYPos');
+    var theta = document.getElementById('theta');
+
+    maxInitPos();
+
+    window.addEventListener('resize', maxInitPos);
+
+    for (var i = 0; i < inputs.length; i++) {
+      input = inputs[i];
+
+      input.parentNode.querySelector('span').textContent = input.value;
+
+      input.addEventListener('input', function(e) {
+        this.parentNode.querySelector('span').textContent = this.value;
+
+        if (
+          (!runningAnimation || !runningAnimation.projectileAnimation) &&
+          (this.id === 'initXPos' ||
+            this.id === 'initYPos' ||
+            this.id === 'theta')
+        ) {
+          projectile.style.left = initXPos.value + 'px';
+          projectile.style.bottom = initYPos.value + 'px';
+
+          angleLine.style.left =
+            Number(angleLineInitXPos) + Number(initXPos.value) + 'px';
+          angleLine.style.bottom =
+            Number(angleLineInitYPos) + Number(initYPos.value) + 'px';
+          angleLine.style.webkitTransform = 'rotate(-' + theta.value + 'deg)';
+          angleLine.style.transform = 'rotate(-' + theta.value + 'deg)';
+        }
+      });
+    }
+  };
+
+  var startAnimation = function() {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      var initV = document.getElementById('initV').value;
+      var g = -125;
+      var fc = 0.7;
+      var theta = document.getElementById('theta').value;
+      var initXPos = document.getElementById('initXPos').value;
+      var initYPos = document.getElementById('initYPos').value;
+
+      if (runningAnimation) {
+        runningAnimation.stopAnimation();
+      }
+
+      runningAnimation = new Projectile({
+        selector: projectile,
+        initV: +initV,
+        g: +g,
+        frictionCo: +fc,
+        degrees: +theta,
+        initXPos: +initXPos,
+        initYPos: +initYPos
+      });
+
+      runningAnimation.startAnimation();
+    });
+  };
+
+  var resetAnimation = function() {
+    form.addEventListener('reseet', function(e) {
+          resetAnimation();
+    });
+  };
+
+  var init = function(options) {
+    form = options.form;
+    projectile = options.projectile;
+    container = options.simulationContainer;
+    angleLine = options.angleLine;
+    inputs = form.querySelectorAll('input[type=range]');
+
+    angleLineInitXPos = projectile.offsetWidth / 2;
+    angleLineInitYPos = projectile.offsetHeight / 2;
+    console.log("staaaaaaaaaaaaaaaa")
+    formValueDisplays();
+    startAnimation();
+
+  };
+
+  return {
+    init: init
+  };
+})();
+
+module.exports = formControls;
+
+},{"physics-projectile":7}],4:[function(require,module,exports){
+module.exports = (function() {
+  var  form, projectile, angleLine;
+
+
+  var init = function(options) {
+    form = options.form;
+    projectile = options.projectile;
+    angleLine = options.angleLine;
+
+    form.classList.add('fade-in');
+    projectile.classList.add('fade-in');
+    angleLine.classList.add('fade-in');
+  };
+
+  return {
+    init: init
+  };
+})();
+
+},{}],5:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _physicsProjectile = _interopRequireDefault(require("physics-projectile"));
+
+var _utils = require("./utils");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var _default = function () {
+  let numJumpers, jumpyClass;
+  let isRunning = false;
+  const winWidth = window.outerWidth;
+  const frag = document.createDocumentFragment();
+
+  const initJumpers = function () {
+    for (let i = 0; i < numJumpers; ++i) {
+      const jumper = document.createElement('i');
+      jumper.classList.add('jumper', `jumper-${i}`, jumpyClass);
+      jumper.style.zIndex = (0, _utils.getRandomNum)(0, 10);
+      frag.appendChild(jumper);
+    }
+
+    document.body.appendChild(frag);
+  };
+
+  const jumpEm = function () {
+    for (let i = 0; i < numJumpers; ++i) {
+      (function (i) {
+        let initDelay = (0, _utils.getRandomNum)(0, 5000);
+        let initV = (0, _utils.getRandomNum)(250, 750);
+        let g = (0, _utils.getRandomNum)(-1000, 0);
+        let degrees = (0, _utils.getRandomNum)(70, 90);
+        let initXPos = (0, _utils.getRandomNum)(0, winWidth);
+        setTimeout(function Jump() {
+          let runningAnimation = new _physicsProjectile.default({
+            selector: document.querySelector(`.jumper-${i}`),
+            initV: initV,
+            g: g,
+            frictionCo: 0.5,
+            degrees: degrees,
+            initXPos: initXPos,
+            initYPos: -50
+          });
+          runningAnimation.startAnimation();
+          const checkifStopped = setInterval(function () {
+            if (isRunning && !runningAnimation.projectileAnimation) {
+              clearInterval(checkifStopped);
+              Jump();
+            }
+
+            if (!isRunning) {
+              clearInterval(checkifStopped);
+            }
+          }, 1000);
+        }, initDelay);
+      })(i);
+    }
+  };
+
+  const init = function (jumperCount = 20, className = 'jumpy-class') {
+    numJumpers = jumperCount;
+    jumpyClass = className;
+    isRunning = true;
+    initJumpers();
+    jumpEm();
+    return true;
+  };
+
+  const stop = function () {
+    isRunning = false;
+    return true;
+  };
+
+  return {
+    init,
+    stop,
+    start: jumpEm
+  };
+}();
+
+exports.default = _default;
+},{"./utils":6,"physics-projectile":7}],6:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.getRandomNum = void 0;
+
+const getRandomNum = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
+
+exports.getRandomNum = getRandomNum;
+},{}],7:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+class Projectile {
+  constructor({
+    selector,
+    initV = 250,
+    g = -10,
+    frictionCo = 0.5,
+    degrees = 90,
+    initXPos = 0,
+    initYPos = -50
+  }) {
+    if (!selector) {
+      throw new Error('must supply a selector');
+    }
+
+    this.projectile = selector;
+    this.initV = initV;
+    this.g = g;
+    this.frictionCo = frictionCo;
+    this.frictionalA = this.frictionCo * this.g;
+    this.theta = degrees * (Math.PI / 180);
+    this.initXPos = initXPos;
+    this.initYPos = initYPos;
+    this.initVx = this.initV * Math.cos(this.theta);
+    this.initVy = this.initV * Math.sin(this.theta);
+    this.animationStartTime = 0;
+    this.frictionStartTime = 0;
+  }
+
+  projectileFrame(t) {
+    this.animationStartTime = this.animationStartTime || t;
+    t = t - this.animationStartTime; 
+
+    t = t / 1000;
+    let frictionTime = 0;
+    let yPos = this.initYPos + this.initVy * t + 1 / 2 * (this.g) * Math.pow(t, 2);
+    yPos = Math.max(0, yPos);
+    console.log(yPos);
+    document.getElementById('yaxis').innerHTML= yPos;
+
+    if (this.projectileAnimation > 1 && yPos === 0) {
+      this.frictionStartTime = this.frictionStartTime || t;
+      frictionTime = t - this.frictionStartTime;
+    }
+
+    let prevXPos = +this.projectile.style.left.slice(0, -2);
+    let xPos = this.initXPos + this.initVx * t + 1 / 2 * this.frictionalA * Math.pow(frictionTime, 2);
+    xPos = Math.max(prevXPos, xPos);
+    this.projectile.style.left = xPos + 'px';
+    this.projectile.style.bottom = yPos + 'px';
+
+    console.log(xPos);
+    document.getElementById('xaxis').innerHTML= xPos;
+
+    if (t === 0 || xPos !== prevXPos) {
+      this.projectileAnimation = requestAnimationFrame(this.projectileFrame.bind(this));
+      return null;
+    }
+    this.stopAnimation();
+  }
+
+  startAnimation() {
+    this.projectile.style.left = this.initXPos + 'px';
+    this.projectile.style.bottom = this.initYPos + 'px';
+    this.projectileAnimation = requestAnimationFrame(this.projectileFrame.bind(this));
+    return true;
+  }
+  resetAnimation() {
+    console.log("rrrrrrrrrrrrr");
+    return true;
+  }
+  stopAnimation() {
+    cancelAnimationFrame(this.projectileAnimation);
+    this.projectileAnimation = undefined;
+    return true;
+  }
+
+}
+
+var _default = Projectile;
+exports.default = _default;
+},{}]},{},[2])
+
+
+function dddAnimation() {
+  console.log("dddddddddddd");
+  document.getElementById('initV').value=250; 
+  document.getElementById('theta').value=45; 
+  document.getElementById('initXPos').value=0; 
+  document.getElementById('initYPos').value=0; 
+
+}
+  </script>
+</body>
+</html>
